@@ -5,7 +5,7 @@ adb kill-server
 adb start-server
 
 # Specify the APK file name
-apk_file="YourApp.apk"
+apk_file="PokemodAtlas-Public-v23071801.apk"
 
 # Read device list into array
 mapfile -t devices < "./DeviceList.txt"
@@ -19,7 +19,7 @@ for i in "${devices[@]}"; do
     adb connect $i:5555
 
     # Get device name
-    deviceName=$(adb -s $i:5555 shell getprop ro.product.model)
+    deviceName=$(adb -s $i shell "cat /data/local/tmp/atlas_config.json" | awk -F\" '{print $12}')
     echo "Connecting to $i ($deviceName)"
 
     # Install the APK
