@@ -1,20 +1,35 @@
 #!/usr/bin/env bash
 
+# Function to determine the color based on the device temperature
+get_embed_color() {
+    local temp_raw=$1
+    if [[ ! -z "$temp_raw" ]]; then
+        if [[ $temp_raw -gt 70000 ]]; then
+            echo 16711680  # Red
+        elif [[ $temp_raw -gt 60000 ]]; then
+            echo 16776960  # Yellow
+        else
+            echo 65280     # Green
+        fi
+    else
+        echo "No temperature data"
+    fi
+}
+
+# ENTER YOU WEBHOOK URL FOR YOUR STATS CHANNEL
 discord_webhook="your_discord_webhook"
 adb kill-server
 
 version=$1
-mapfile -t devices < "./DeviceList.txt"
 
+mapfile -t devices < "./DeviceList.txt"
 
 totalPokemonCount=0
 totalPtoJsonCount=0
 totalGmoEmptyCount=0
 deviceCount=0
 
-
 for i in "${devices[@]}"; do
-
     adb connect $i:5555
     type=$(adb -s $i:5555 shell uname -m)
     echo "Connecting to $i"
@@ -40,14 +55,36 @@ for i in "${devices[@]}"; do
     echo "Checking for 'Another empty GMO?' Errors: $gmoEmpty"
     noPokemonCount=$(adb -s $i shell "grep -o 'No pokemon found' /data/local/tmp/atlas.log | wc -l")
     echo "Checking for 'No pokemon found' Phrases: $noPokemonCount"
+    color=$(get_embed_color $deviceTempRaw)
+    
+    
+    device_data=$(cat <<EOF
+{
+  "title": "📱 **Device Info: $atlasDeviceName**",
+  "color": $color,
+  "fields": [
+    {"name": "**🌡 Device Temp**", "value": "*$deviceTemp°C*", "inline": true},
+    {"name": "**🔢 Pogo Version**", "value": "$pogoVer", "inline": true},
+    {"name": "**⏰ ATV Uptime**", "value": "$atvupti", "inline": true},
+    {"name": "**🔧 Atlas Version**", "value": "$atlasVer", "inline": true},
+    {"name": "**🛠 Magisk Version**", "value": "$magiskVer", "inline": true},
+    {"name": "**🛒 Playstore Version**", "value": "$vendingVer", "inline": true},
+    {"name": "**⚠ GMO Errors**", "value": "$gmoEmpty", "inline": true},
+    {"name": "**🔍 No Pokemon Found**", "value": "$noPokemonCount", "inline": true},
+    {"name": "**🚨 Pto.json Errors**", "value": "$ptojson", "inline": true}
+  ]
+}
+EOF
+)
 
-    [[ ! -z $discord_webhook ]] && curl -S -k -L --fail --show-error -F "payload_json={\"content\": \"__**$atlasDeviceName**__: \n Device temp: ${deviceTemp}°C \n Pogo Version: $pogoVer \n ATV Uptime: $atvupti \n Atlas Version: $atlasVer \n Magisk Version: $magiskVer \n Playstore Version: $vendingVer \n GMO Errors: $gmoEmpty \n No Pokemon Found Count: $noPokemonCount \"}" $discord_webhook &>/dev/null
+
+
+    curl -S -k -L --fail --show-error -X POST -H "Content-Type: application/json" --data "{\"embeds\": [$device_data]}" $discord_webhook
 
     totalPokemonCount=$((totalPokemonCount + noPokemonCount))
     totalPtoJsonCount=$((totalPtoJsonCount + ptojson))
     totalGmoEmptyCount=$((totalGmoEmptyCount + gmoEmpty))
     deviceCount=$((deviceCount + 1))
-
 done
 
 if [ $deviceCount -gt 0 ]; then
@@ -55,9 +92,27 @@ if [ $deviceCount -gt 0 ]; then
     averagePtoJsonCount=$(awk -v total=$totalPtoJsonCount -v count=$deviceCount 'BEGIN { printf "%.2f", total/count }')
     averageGmoEmptyCount=$(awk -v total=$totalGmoEmptyCount -v count=$deviceCount 'BEGIN { printf "%.2f", total/count }')
 
-    echo "Average 'No pokemon found' Count Across All Devices: $averagePokemonCount"
-    echo "Average 'Pto.json' Count Across All Devices: $averagePtoJsonCount"
-    echo "Average 'Another empty GMO?' Count Across All Devices: $averageGmoEmptyCount"
+    average_data=$(cat <<EOF
+{
+  "title": "📊 **Average Statistics**",
+  "description": "Here are the average statistics gathered from all devices.",
+  "color": 3447003,
+  "fields": [
+    {"name": "🔎 Average 'No pokemon found'", "value": "${averagePokemonCount}", "inline": true},
+    {"name": "⚠️ Average 'Pto.json' Count", "value": "${averagePtoJsonCount}", "inline": true},
+    {"name": "❗ Average 'Another empty GMO?'", "value": "${averageGmoEmptyCount}", "inline": true}
+  ],
+  "footer": {
+    "text": "Statistics generated on $(date '+%Y-%m-%d %H:%M:%S %Z %:z')"
+  }
+}
+EOF
+)
 
-    [[ ! -z $discord_webhook ]] && curl -S -k -L --fail --show-error -F "payload_json={\"content\": \"Average 'No pokemon found' Count: $averagePokemonCount\nAverage 'Pto.json' Count: $averagePtoJsonCount\nAverage 'Another empty GMO?' Count: $averageGmoEmptyCount\"}" $discord_webhook &>/dev/null
+# For debugging purposes, print the generated JSON
+echo "Generated JSON payload: $average_data"
+
+# Send the POST request
+curl -S -k -L --fail --show-error -X POST -H "Content-Type: application/json" --data "{\"embeds\": [$average_data]}" $discord_webhook
+
 fi
