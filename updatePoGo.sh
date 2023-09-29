@@ -5,7 +5,7 @@ adb kill-server
 adb start-server
 
 # Specify the APK file name
-apk_file="PokemodAtlas-Public-v23071801.apk"
+apk_file="your_apk_file.apk"
 
 # Read device list into array
 mapfile -t devices < "./DeviceList.txt"
