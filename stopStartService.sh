@@ -22,10 +22,6 @@ for i in "${devices[@]}"; do
     deviceName=$(adb -s $i shell "cat /data/local/tmp/atlas_config.json" | awk -F\" '{print $12}')
     echo "Connecting to $i ($deviceName)"
 
-    # Install the APK
-    adb -s $i:5555 install $apk_file
-    echo "APK installed on $i ($deviceName)"
-
     # Force-stop the apps
     adb -s $i:5555 shell "su -c 'am force-stop com.nianticlabs.pokemongo && am force-stop com.pokemod.atlas'"
     echo "Force-stopped apps on $i ($deviceName)"
