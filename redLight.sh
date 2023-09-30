@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#THIS WORKS ONLY ON H96 MAX devices and specifically blue-board A10 ROM.
+
 # Define the command to be executed
 COMMAND="su -c 'echo 1 > /sys/class/leds/power-red/brightness'"
 
